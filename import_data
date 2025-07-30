@@ -1,0 +1,61 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.types import *
+from pyspark.sql.functions import col
+import json
+import pytest
+import os
+import numpy as np
+import matplotlib
+
+
+import pandas as pd
+
+
+spark = SparkSession.builder.appName("Proyecto-Big-Data").getOrCreate()
+spark.sparkContext.setLogLevel("WARN")
+def cargar_json(ruta_archivo):
+    with open(ruta_archivo, 'r') as f:
+        datos = json.load(f)
+
+    # Extracción de registros
+    campos = datos['fields']
+    registros = datos['records']
+    
+    mapeo_tipos = {
+        "int": IntegerType(),
+        "text": StringType()
+    }
+    
+    # Crear esquema 
+    esquema = StructType([
+        StructField(campo['id'], mapeo_tipos.get(campo['type'], StringType()), nullable=True)
+        for campo in campos])
+    
+    # Creación del DataFrame de Spark
+    rdd = spark.sparkContext.parallelize(registros)
+    df = spark.createDataFrame(rdd, esquema)
+    
+    # Convertir tipos de datos
+    for campo in campos:
+        tipo_spark = mapeo_tipos.get(campo['type'], StringType())
+        df = df.withColumn(campo['id'], col(campo['id']).cast(tipo_spark))
+    return df
+
+# Cargamos los datasets con la funcion que hicimos
+df_comida = cargar_json("comida.json")
+df_desempleo = cargar_json("desempleo.json")
+
+# Limpieza básica  
+for df in [df_comida, df_desempleo]:
+    df = df.dropDuplicates()  # Eliminar duplicados
+    df = df.na.fill("Desconocido")  # Tratar valores nulos
+
+# Mostrar resultados
+print("Esquema Comida:")
+df_comida.printSchema()
+
+print("\nEsquema Desempleo:")
+df_desempleo.printSchema()
+
+print(f"\nRegistros Comida: {df_comida.count()}")
+print(f"Registros Desempleo: {df_desempleo.count()}")

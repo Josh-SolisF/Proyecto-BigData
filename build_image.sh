@@ -1,2 +1,2 @@
 #!/bin/bash
-docker build --tag bd-tarea3 .
+docker build --tag proyecto-bigdata .
